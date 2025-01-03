@@ -1,5 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { MD5 } from 'crypto-js';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class PayHereService {
@@ -21,4 +23,57 @@ export class PayHereService {
     'app.payhere.authorizationCode',
   );
   private readonly auth_url = this.configService.get('app.payhere.authUrl');
+
+  async generatePreApprovalUrl(order: {
+    order_id: string;
+    items: string;
+    totalAmount: string;
+    user: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone: string;
+      address: string;
+      city: string;
+    };
+  }) {
+    try {
+      const payload = {
+        merchant_id: this.merchantId,
+        return_url: this.returnUrl,
+        cancel_url: `${this.cancelUrl}?order_id=${order.order_id}`,
+        notify_url: this.notifyUrl,
+        first_name: order.user.firstName,
+        last_name: order.user.lastName,
+        email: order.user.email,
+        phone: order.user.phone,
+        address: order.user.address,
+        city: order.user.city,
+        country: this.country,
+        order_id: order.order_id,
+        items: order.items,
+        currency: this.currency,
+        amount: order.totalAmount,
+        hash: this.generatePayHereHash(order.order_id, order.totalAmount),
+      };
+
+      return payload;
+    } catch (error) {
+      throw new Error(`Error redirecting to PayHere: ${error.message}`);
+    }
+  }
+
+  generatePayHereHash = (orderId: string, amount: string) => {
+    let hashedSecret = MD5(this.merchantSecret).toString().toUpperCase();
+    let amountFormated = parseFloat(amount)
+      .toLocaleString('en-us', { minimumFractionDigits: 2 })
+      .replaceAll(',', '');
+    let currency = this.currency;
+    let hash = MD5(
+      this.merchantId + orderId + amountFormated + currency + hashedSecret,
+    )
+      .toString()
+      .toUpperCase();
+    return hash;
+  };
   }
