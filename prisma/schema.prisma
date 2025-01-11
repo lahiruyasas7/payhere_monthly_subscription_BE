@@ -22,6 +22,8 @@ model User {
   address String
   city String
   country String
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @updatedAt
   payment_eligibility Boolean @default(false)
   subscription Subscription?
 }
