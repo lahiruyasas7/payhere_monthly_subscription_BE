@@ -3,7 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from 'src/configs/database-configs/prisma.service';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { PayHereService } from 'src/utils/payhere.service';
-import { SubscriptionStatus } from '@prisma/client';
+import { SubscriptionPaymentStatus, SubscriptionStatus } from '@prisma/client';
 
 @Injectable()
 export class SubscriptionService {
@@ -159,5 +159,98 @@ export class SubscriptionService {
 
     // Return pre-approval payload to the client
     return preApprovalPayload;
+  }
+
+  private getSubscriptionStatus(status: string): SubscriptionPaymentStatus {
+    switch (status) {
+      case '2':
+        return SubscriptionPaymentStatus.SUCCESS;
+      case '0':
+        return SubscriptionPaymentStatus.PENDING;
+      case '-1':
+        return SubscriptionPaymentStatus.CANCELED;
+      case '-2':
+        return SubscriptionPaymentStatus.FAILED;
+      default:
+        return SubscriptionPaymentStatus.FAILED;
+    }
+  }
+
+  async notifySubscribePayment(body: any) {
+    try {
+      const {
+        merchant_id,
+        order_id,
+        payment_id,
+        payhere_amount,
+        payhere_currency,
+        status_code,
+        md5sig,
+        status_message,
+        customer_token,
+      } = body;
+
+      // Generate local md5sig
+      const local_md5sig = this.payHereService.generateMd5sig(
+        merchant_id,
+        order_id,
+        payhere_amount,
+        payhere_currency,
+        status_code,
+      );
+
+      this.logger.log('Check Subscription Status');
+      let status = undefined;
+      if (local_md5sig === md5sig) {
+        status = this.getSubscriptionStatus(status_code);
+        this.logger.log(`Subscription Status is ${status}`);
+      } else {
+        status = SubscriptionPaymentStatus.FAILED;
+        this.logger.log('Subscription Status is FAILED');
+      }
+
+      const subscription = await this.prisma.subscription.findUnique({
+        where: {
+          orderId: order_id,
+        },
+        include: {
+          user: true,
+        },
+      });
+      if (subscription) {
+        await this.prisma.subscription.update({
+          where: { subscriptionId: subscription.subscriptionId },
+          data: { customer_token: customer_token },
+        });
+        await this.prisma.subscriptionPayment.create({
+          data: {
+            subscriptionId: subscription.subscriptionId,
+            md5sig,
+            payhere_payment_id: payment_id,
+            payhere_status_message: status_message,
+            payment_amount: payhere_amount,
+            payment_date: new Date().toISOString(),
+            status,
+          },
+        });
+        if (status === 'SUCCESS') {
+          // await this.mailService.sendUserMailSubscription(
+          //   subscription.tenant.email,
+          //   'Your Subscription payment is Success.',
+          // );
+          // this.logger.log(`Email sent to: ${subscription.user.email}`);
+          console.log('subscription payment success')
+        } else {
+          // await this.mailService.sendUserMailSubscription(
+          //   subscription.user.email,
+          //   'Your Subscription payment is Fail. Please try again.',
+          // );
+          // this.logger.log(`Email sent to: ${subscription.user.email}`);
+          console.log('subscription payment failed')
+        }
+      }
+    } catch (error) {
+      this.logger.error(error);
+    }
   }
 }

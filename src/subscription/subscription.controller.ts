@@ -28,4 +28,10 @@ export class SubscriptionController {
       );
     }
   }
+
+  @Post('notify-subscribe')
+  async notifySubscribePayment(@Body() body: any) {
+    const result = await this.subscriptionService.notifySubscribePayment(body);
+    return result;
+  }
 }
