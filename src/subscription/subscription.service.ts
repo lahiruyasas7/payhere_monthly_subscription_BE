@@ -1,11 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from 'src/configs/database-configs/prisma.service';
+import { CreateSubscriptionDto } from './dto/create-subscription.dto';
+import { PayHereService } from 'src/utils/payhere.service';
+import { SubscriptionStatus } from '@prisma/client';
 
 @Injectable()
 export class SubscriptionService {
-private readonly logger = new Logger(SubscriptionService.name);
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(SubscriptionService.name);
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly payHereService: PayHereService,
+  ) {}
   /**
    * This method updates the payment_eligibility for users
    * that are 3 months old.
@@ -48,15 +54,15 @@ private readonly logger = new Logger(SubscriptionService.name);
       });
 
       // Send emails to eligible users
-    //   for (const tenant of eligibleTenants) {
-    //     if (tenant.email) {
-    //       await this.mailService.sendUserMailSubscription(
-    //         tenant.email,
-    //         'You need to subscribe.',
-    //       );
-    //       this.logger.log(`Email sent to: ${tenant.email}`);
-    //     }
-    //   }
+      //   for (const tenant of eligibleTenants) {
+      //     if (tenant.email) {
+      //       await this.mailService.sendUserMailSubscription(
+      //         tenant.email,
+      //         'You need to subscribe.',
+      //       );
+      //       this.logger.log(`Email sent to: ${tenant.email}`);
+      //     }
+      //   }
     } catch (error) {
       this.logger.error('Error updating payment eligibility', error);
     }
@@ -65,7 +71,7 @@ private readonly logger = new Logger(SubscriptionService.name);
   /**
    * Run the updatePaymentEligibility method 3 times per day.
    */
-  @Cron(CronExpression.EVERY_HOUR) 
+  @Cron(CronExpression.EVERY_HOUR)
   handleCron() {
     this.logger.log('Running payment eligibility cron job...');
     this.updatePaymentEligibility();
@@ -95,5 +101,63 @@ private readonly logger = new Logger(SubscriptionService.name);
 
       return `${prefix}${formattedId}`;
     });
+  }
+
+  /**
+   * method for created subscription
+   * @param createSubscriptionDto
+   * @returns
+   */
+  async createSubscription(createSubscriptionDto: CreateSubscriptionDto) {
+    const { items, totalAmount, user } = createSubscriptionDto;
+
+    // check user in database
+    const selectedUser = await this.prisma.user.findUnique({
+      where: { user_id: user.user_id },
+    });
+    if (!selectedUser) {
+      this.logger.error('User not found');
+      throw new NotFoundException('User not found');
+    }
+    this.logger.log(`User ID: ${user.user_id}`);
+
+    const orderId = await this.generateOrderId();
+    // Generate PayHere pre-approval URL payload
+    const preApprovalPayload = await this.payHereService.generatePreApprovalUrl(
+      {
+        order_id: orderId,
+        items,
+        totalAmount,
+        user,
+      },
+    );
+
+    // subscription data to the database
+    await this.prisma.subscription.upsert({
+      where: { user_id: user.user_id }, // Unique constraint
+      update: {
+        orderId,
+        items,
+        totalAmount,
+        userEmail: user.email,
+        status: SubscriptionStatus.PENDING,
+        customer_token: '',
+        updatedAt: new Date(),
+      },
+      create: {
+        orderId,
+        items,
+        totalAmount,
+        userEmail: user.email,
+        status: SubscriptionStatus.PENDING,
+        user_id: user.user_id,
+        customer_token: '',
+      },
+    });
+
+    this.logger.log(`Subscription created for Order ID: ${orderId}`);
+
+    // Return pre-approval payload to the client
+    return preApprovalPayload;
   }
 }
