@@ -32,7 +32,7 @@ export class PayHereService {
       firstName: string;
       lastName: string;
       email: string;
-      phone: string;
+      phoneNumber: string;
       address: string;
       city: string;
     };
@@ -46,7 +46,7 @@ export class PayHereService {
         first_name: order.user.firstName,
         last_name: order.user.lastName,
         email: order.user.email,
-        phone: order.user.phone,
+        phone: order.user.phoneNumber,
         address: order.user.address,
         city: order.user.city,
         country: this.country,
