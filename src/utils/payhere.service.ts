@@ -1,5 +1,5 @@
-import { Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { MD5 } from 'crypto-js';
 import * as crypto from 'crypto';
 
@@ -76,4 +76,28 @@ export class PayHereService {
       .toUpperCase();
     return hash;
   };
+
+  generateMd5sig(
+    merchant_id: string,
+    order_id: string,
+    payhere_amount: string,
+    payhere_currency: string,
+    status_code: string,
+  ): string {
+    const secretHash = crypto
+      .createHash('md5')
+      .update(this.merchantSecret)
+      .digest('hex')
+      .toUpperCase();
+
+    // Concatenate values as per PayHere documentation
+    const rawSignature = `${merchant_id}${order_id}${payhere_amount}${payhere_currency}${status_code}${secretHash}`;
+
+    // Return the final MD5 hash and convert it to uppercase
+    return crypto
+      .createHash('md5')
+      .update(rawSignature)
+      .digest('hex')
+      .toUpperCase();
   }
+}
