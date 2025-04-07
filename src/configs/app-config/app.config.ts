@@ -2,6 +2,7 @@ import { registerAs } from '@nestjs/config';
 import { applicationConfig } from './config';
 
 export default registerAs('app', () => ({
+  port: applicationConfig.port,
   // Database Config
   database: {
     databaseUrl: applicationConfig.database.databaseUrl,
