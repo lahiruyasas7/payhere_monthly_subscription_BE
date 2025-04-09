@@ -6,9 +6,10 @@ import { AppConfigModule } from './configs/app-config/app.config.module';
 import { DatabaseConfig } from './configs/database-configs/databse-config.module';
 import { PrismaModule } from './configs/database-configs/prisma.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
-  imports: [AppConfigModule, DatabaseConfig, SubscriptionModule, PrismaModule, ScheduleModule.forRoot()],
+  imports: [AppConfigModule, DatabaseConfig, SubscriptionModule, PrismaModule, ScheduleModule.forRoot(), AuthModule],
   controllers: [AppController],
   providers: [AppService],
 })
