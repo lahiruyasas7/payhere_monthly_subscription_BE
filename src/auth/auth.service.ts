@@ -15,7 +15,6 @@ export class AuthService {
   private logger: Logger = new Logger(AuthService.name);
   constructor(
     private readonly prismaService: PrismaService,
-    private readonly jwtService: JwtService,
   ) {}
 
   async register(registerUserDto: RegisterUserDto) {
