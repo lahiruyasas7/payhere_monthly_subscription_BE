@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from 'src/configs/database-configs/prisma.service';
@@ -7,7 +12,7 @@ import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
-    private logger: Logger = new Logger(AuthService.name);
+  private logger: Logger = new Logger(AuthService.name);
   constructor(
     private readonly prismaService: PrismaService,
     private readonly jwtService: JwtService,
@@ -21,16 +26,18 @@ export class AuthService {
         password,
         firstName,
         lastName,
-        phone,
+        phoneNumber,
         //profileImage,
         address,
+        city,
+        country,
       } = registerUserDto;
 
       // hash password using bcrypt
       const hashedPassword = await bcrypt.hash(password, 10);
 
       // Check existing user
-      const existingUser = await this.prismaService.user.findOne({
+      const existingUser = await this.prismaService.user.findUnique({
         where: { email },
       });
       if (existingUser) {
@@ -38,16 +45,20 @@ export class AuthService {
       }
 
       // create new user
-      const newUser = this.prismaService.user.create({
-        email,
-        password: hashedPassword,
-        firstName,
-        lastName,
-        phone,
-        address,
+      const newUser = await this.prismaService.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          firstName,
+          lastName,
+          phoneNumber,
+          address,
+          city,
+          country,
+        },
       });
 
-      await this.prismaService.user.save(newUser);
+      //await this.prismaService.user.save(newUser);
 
       return newUser;
     } catch (error) {
