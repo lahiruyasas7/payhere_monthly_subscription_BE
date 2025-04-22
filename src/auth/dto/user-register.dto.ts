@@ -19,7 +19,7 @@ export class RegisterUserDto {
 
   @IsNotEmpty({ message: 'Phone Number can not be empty' })
   @IsString()
-  phone: string;
+  phoneNumber: string;
 
   @IsNotEmpty({ message: 'Address can not be empty' })
   @IsString()
