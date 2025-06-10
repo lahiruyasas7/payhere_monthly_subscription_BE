@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from 'src/configs/database-configs/prisma.service';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
@@ -114,12 +119,21 @@ export class SubscriptionService {
     // check user in database
     const selectedUser = await this.prisma.user.findUnique({
       where: { user_id: user.user_id },
+      select: {
+        user_id: true,
+        payment_eligibility: true,
+      },
     });
     if (!selectedUser) {
       this.logger.error('User not found');
       throw new NotFoundException('User not found');
     }
     this.logger.log(`User ID: ${user.user_id}`);
+
+    if (!selectedUser.payment_eligibility) {
+      this.logger.error(`User not eligible for payment: ${user.user_id}`);
+      throw new ForbiddenException('User is not eligible for payment');
+    }
 
     const orderId = await this.generateOrderId();
     // Generate PayHere pre-approval URL payload
@@ -239,14 +253,14 @@ export class SubscriptionService {
           //   'Your Subscription payment is Success.',
           // );
           // this.logger.log(`Email sent to: ${subscription.user.email}`);
-          console.log('subscription payment success')
+          console.log('subscription payment success');
         } else {
           // await this.mailService.sendUserMailSubscription(
           //   subscription.user.email,
           //   'Your Subscription payment is Fail. Please try again.',
           // );
           // this.logger.log(`Email sent to: ${subscription.user.email}`);
-          console.log('subscription payment failed')
+          console.log('subscription payment failed');
         }
       }
     } catch (error) {
